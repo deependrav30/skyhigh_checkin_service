@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: skyhigh
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/skyhigh
+      REDIS_URL: redis://redis:6379
+      API_PORT: 3000
+      API_HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker.js"]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/skyhigh
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  weight-mock:
+    image: node:18
+    command: ["node", "mock-weight.js"]
+    working_dir: /app
+    volumes:
+      - ./mocks:/app
+    ports:
+      - "4001:4001"
+
+  payment-mock:
+    image: node:18
+    command: ["node", "mock-payment.js"]
+    working_dir: /app
+    volumes:
+      - ./mocks:/app
+    ports:
+      - "4002:4002"

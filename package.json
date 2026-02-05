@@ -1,0 +1,14 @@
+{
+  "name": "skyhigh-root",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "api"
+  ],
+  "scripts": {
+    "postinstall": "npm --prefix api install",
+    "dev:api": "npm --prefix api run dev",
+    "build:api": "npm --prefix api run build",
+    "start:api": "npm --prefix api run start"
+  }
+}

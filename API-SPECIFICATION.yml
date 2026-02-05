@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: SkyHigh Core API
+  version: 0.1.0
+  description: Core check-in and seat management API (Fastify backend).
+servers:
+  - url: http://localhost:3000
+paths:
+  /auth/pnr-login:
+    post:
+      summary: Login via PNR and last name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PnrLoginRequest'
+      responses:
+        '200':
+          description: Booking context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PnrLoginResponse'
+        '401':
+          description: Invalid PNR/last name
+  /flights/{flightId}/seatmap:
+    get:
+      summary: Get seat map for a flight
+      parameters:
+        - $ref: '#/components/parameters/flightId'
+      responses:
+        '200':
+          description: Seat map with states
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatMapResponse'
+  /flights/{flightId}/seats/{seatId}/hold:
+    post:
+      summary: Place a 120s hold on an AVAILABLE seat
+      parameters:
+        - $ref: '#/components/parameters/flightId'
+        - $ref: '#/components/parameters/seatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldRequest'
+      responses:
+        '200':
+          description: Hold placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldResponse'
+        '409':
+          description: Seat not AVAILABLE
+  /holds/{holdId}/confirm:
+    post:
+      summary: Confirm a held seat
+      parameters:
+        - $ref: '#/components/parameters/holdId'
+      responses:
+        '200':
+          description: Seat confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmResponse'
+        '404':
+          description: Hold not found or expired
+        '409':
+          description: Ownership or state mismatch
+  /holds/{holdId}/cancel:
+    post:
+      summary: Cancel a hold or confirmed seat
+      parameters:
+        - $ref: '#/components/parameters/holdId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelRequest'
+      responses:
+        '200':
+          description: Seat released/cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResponse'
+  /flights/{flightId}/waitlist:
+    post:
+      summary: Join waitlist for a flight
+      parameters:
+        - $ref: '#/components/parameters/flightId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WaitlistRequest'
+      responses:
+        '200':
+          description: Waitlist entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitlistResponse'
+  /checkins/{checkinId}/baggage:
+    post:
+      summary: Submit baggage weight for check-in
+      parameters:
+        - $ref: '#/components/parameters/checkinId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaggageRequest'
+      responses:
+        '200':
+          description: Check-in state after baggage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaggageResponse'
+  /payments/webhook:
+    post:
+      summary: Payment provider webhook to resume check-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhookRequest'
+      responses:
+        '200':
+          description: Webhook processed (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentWebhookResponse'
+components:
+  parameters:
+    flightId:
+      name: flightId
+      in: path
+      required: true
+      schema:
+        type: string
+    seatId:
+      name: seatId
+      in: path
+      required: true
+      schema:
+        type: string
+    holdId:
+      name: holdId
+      in: path
+      required: true
+      schema:
+        type: string
+    checkinId:
+      name: checkinId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    PnrLoginRequest:
+      type: object
+      required: [pnr, lastName]
+      properties:
+        pnr:
+          type: string
+          example: ABC123
+        lastName:
+          type: string
+          example: Doe
+    PnrLoginResponse:
+      type: object
+      required: [checkinId, flightId, passenger, seatMap]
+      properties:
+        checkinId:
+          type: string
+        flightId:
+          type: string
+        passenger:
+          type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+        seatMap:
+          $ref: '#/components/schemas/SeatMapResponse'
+    SeatMapResponse:
+      type: object
+      required: [flightId, lastUpdated, seats]
+      properties:
+        flightId:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/Seat'
+    Seat:
+      type: object
+      required: [seatId, state]
+      properties:
+        seatId:
+          type: string
+        state:
+          type: string
+          enum: [AVAILABLE, HELD, CONFIRMED, CANCELLED]
+        heldBy:
+          type: string
+          nullable: true
+        holdExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+    HoldRequest:
+      type: object
+      properties:
+        passengerId:
+          type: string
+      required: [passengerId]
+    HoldResponse:
+      type: object
+      required: [holdId, seatId, flightId, state, holdExpiresAt]
+      properties:
+        holdId:
+          type: string
+        seatId:
+          type: string
+        flightId:
+          type: string
+        state:
+          type: string
+          enum: [HELD]
+        holdExpiresAt:
+          type: string
+          format: date-time
+    ConfirmResponse:
+      type: object
+      required: [seatId, flightId, state]
+      properties:
+        seatId:
+          type: string
+        flightId:
+          type: string
+        state:
+          type: string
+          enum: [CONFIRMED]
+    CancelRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        actorRole:
+          type: string
+          enum: [passenger, agent]
+    CancelResponse:
+      type: object
+      required: [seatId, flightId, state]
+      properties:
+        seatId:
+          type: string
+        flightId:
+          type: string
+        state:
+          type: string
+          enum: [CANCELLED, AVAILABLE]
+    WaitlistRequest:
+      type: object
+      properties:
+        passengerId:
+          type: string
+        preferences:
+          type: object
+          additionalProperties: true
+      required: [passengerId]
+    WaitlistResponse:
+      type: object
+      required: [entryId, flightId, status]
+      properties:
+        entryId:
+          type: string
+        flightId:
+          type: string
+        status:
+          type: string
+          enum: [QUEUED, ASSIGNED]
+    BaggageRequest:
+      type: object
+      required: [weightKg]
+      properties:
+        weightKg:
+          type: number
+          format: float
+    BaggageResponse:
+      type: object
+      required: [checkinId, state]
+      properties:
+        checkinId:
+          type: string
+        state:
+          type: string
+          enum: [IN_PROGRESS, WAITING_FOR_PAYMENT, COMPLETED]
+        paymentIntentId:
+          type: string
+          nullable: true
+    PaymentWebhookRequest:
+      type: object
+      required: [intentId, status]
+      properties:
+        intentId:
+          type: string
+        status:
+          type: string
+          enum: [succeeded, failed]
+        providerIdempotencyKey:
+          type: string
+    PaymentWebhookResponse:
+      type: object
+      required: [intentId, status]
+      properties:
+        intentId:
+          type: string
+        status:
+          type: string
+          enum: [succeeded, failed]
+        checkinId:
+          type: string

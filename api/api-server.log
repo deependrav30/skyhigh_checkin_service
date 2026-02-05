@@ -1,0 +1,4 @@
+{"level":30,"time":1770246334063,"pid":27684,"hostname":"Deependras-MacBook-Air.local","msg":"Server listening at http://0.0.0.0:3002"}
+{"level":30,"time":1770246334063,"pid":27684,"hostname":"Deependras-MacBook-Air.local","msg":"Server listening on 0.0.0.0:3002"}
+{"level":30,"time":1770246384808,"pid":27684,"hostname":"Deependras-MacBook-Air.local","reqId":"req-1","req":{"method":"GET","url":"/health","hostname":"localhost:3002","remoteAddress":"127.0.0.1","remotePort":52573},"msg":"incoming request"}
+{"level":30,"time":1770246384810,"pid":27684,"hostname":"Deependras-MacBook-Air.local","reqId":"req-1","res":{"statusCode":200},"responseTime":2.5269999504089355,"msg":"request completed"}

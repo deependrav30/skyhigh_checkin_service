@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<h1>Testing Vite</h1>
+<script>
+fetch('http://localhost:5173')
+  .then(r => r.text())
+  .then(html => {
+    console.log('SUCCESS - Got HTML:', html.substring(0, 100));
+    document.body.innerHTML += '<pre>' + html.substring(0, 500) + '</pre>';
+  })
+  .catch(e => {
+    console.error('ERROR:', e);
+    document.body.innerHTML += '<p style="color:red">Error: ' + e + '</p>';
+  });
+</script>
+</body>
+</html>
