@@ -1,0 +1,104 @@
+# Artillery Load Test Configuration
+# Run with: artillery run artillery-config.yml
+
+config:
+  target: 'http://localhost:3002'
+  phases:
+    # Warm up phase
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm up"
+    
+    # Sustained load
+    - duration: 120
+      arrivalRate: 20
+      name: "Sustained load (20 req/s)"
+    
+    # Peak load
+    - duration: 60
+      arrivalRate: 50
+      name: "Peak load (50 req/s)"
+    
+    # Cool down
+    - duration: 30
+      arrivalRate: 5
+      name: "Cool down"
+  
+  # Performance thresholds
+  ensure:
+    maxErrorRate: 1          # Max 1% error rate
+    p95: 500                 # 95th percentile < 500ms
+    p99: 1000                # 99th percentile < 1000ms
+
+scenarios:
+  # Scenario 1: View seat map (read-heavy)
+  - name: "View seat map"
+    weight: 50
+    flow:
+      - get:
+          url: "/api/seatmap/SK123"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      - think: 2
+
+  # Scenario 2: Hold seat (write operation)
+  - name: "Hold seat"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/seats/hold"
+          json:
+            flightId: "SK123"
+            seatId: "{{ $randomNumber(1, 14) }}{{ $randomString(1, 'ABCDEF') }}"
+            passengerId: "P{{ $randomNumber(1, 1000) }}"
+          expect:
+            - statusCode: [200, 400]  # 400 if seat already held
+      - think: 5
+
+  # Scenario 3: Confirm hold (complete transaction)
+  - name: "Hold and confirm"
+    weight: 15
+    flow:
+      # First hold a seat
+      - post:
+          url: "/api/seats/hold"
+          json:
+            flightId: "SK123"
+            seatId: "{{ $randomNumber(1, 14) }}{{ $randomString(1, 'ABCDEF') }}"
+            passengerId: "P{{ $randomNumber(1, 1000) }}"
+          capture:
+            - json: "$.holdId"
+              as: "holdId"
+      
+      - think: 10
+      
+      # Then confirm it
+      - post:
+          url: "/api/seats/confirm"
+          json:
+            holdId: "{{ holdId }}"
+            passengerId: "P{{ $randomNumber(1, 1000) }}"
+          expect:
+            - statusCode: [200, 400]
+
+  # Scenario 4: Hold and let expire
+  - name: "Hold and expire"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/seats/hold"
+          json:
+            flightId: "SK123"
+            seatId: "{{ $randomNumber(1, 14) }}{{ $randomString(1, 'ABCDEF') }}"
+            passengerId: "P{{ $randomNumber(1, 1000) }}"
+      - think: 125  # Wait for expiry
+
+  # Scenario 5: Health check
+  - name: "Health check"
+    weight: 2
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
