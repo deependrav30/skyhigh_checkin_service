@@ -1,0 +1,1085 @@
+{
+  "info": {
+    "name": "SkyHigh Check-in Service - All Business Scenarios",
+    "description": "Complete API collection for testing all 8 business scenarios including Seat Management, Hold/Confirm/Cancel, Waitlist, Baggage & Payment, and Abuse Detection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "skyhigh-checkin-service"
+  },
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/health",
+              "host": ["{{BASE_URL}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the API server is running"
+          },
+          "response": []
+        },
+        {
+          "name": "Ready Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/ready",
+              "host": ["{{BASE_URL}}"],
+              "path": ["ready"]
+            },
+            "description": "Check if the API server is ready to accept requests"
+          },
+          "response": []
+        }
+      ],
+      "description": "Health and readiness endpoints"
+    },
+    {
+      "name": "1. Authentication & Login",
+      "item": [
+        {
+          "name": "PNR Login - Demo User 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('checkinId', response.checkinId);",
+                  "    pm.environment.set('flightId', response.flightId);",
+                  "    console.log('Checkin ID:', response.checkinId);",
+                  "    console.log('Flight ID:', response.flightId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pnr\": \"DEMO123\",\n  \"lastName\": \"demo\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/pnr-login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "pnr-login"]
+            },
+            "description": "Login with PNR and last name to get booking context"
+          },
+          "response": []
+        },
+        {
+          "name": "PNR Login - Demo User 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pnr\": \"DEMO456\",\n  \"lastName\": \"demo\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/pnr-login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "pnr-login"]
+            },
+            "description": "Login with different demo user credentials"
+          },
+          "response": []
+        },
+        {
+          "name": "PNR Login - Invalid Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pnr\": \"INVALID\",\n  \"lastName\": \"wrong\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/pnr-login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "pnr-login"]
+            },
+            "description": "Test invalid login credentials (should return 401)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 1: User authentication via PNR and last name"
+    },
+    {
+      "name": "2. Seat Map Access",
+      "item": [
+        {
+          "name": "Get Seat Map",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/flights/{{flightId}}/seatmap",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "{{flightId}}", "seatmap"]
+            },
+            "description": "Retrieve the seat map with all seat states (AVAILABLE, HELD, CONFIRMED, CANCELLED)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Seat Map - Specific Flight",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/flights/FL-123/seatmap",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "FL-123", "seatmap"]
+            },
+            "description": "Get seat map for demo flight FL-123"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 2: Access seat maps with cache-backed performance"
+    },
+    {
+      "name": "3. Seat Hold (AVAILABLE → HELD)",
+      "item": [
+        {
+          "name": "Hold Seat 1A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('holdId', response.holdId);",
+                  "    pm.environment.set('seatId', response.seatId);",
+                  "    console.log('Hold ID:', response.holdId);",
+                  "    console.log('Hold Expires At:', response.holdExpiresAt);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"{{checkinId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/{{flightId}}/seats/1A/hold",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "{{flightId}}", "seats", "1A", "hold"]
+            },
+            "description": "Place a 120-second hold on seat 1A"
+          },
+          "response": []
+        },
+        {
+          "name": "Hold Seat 2B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"DEMO456\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/FL-123/seats/2B/hold",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "FL-123", "seats", "2B", "hold"]
+            },
+            "description": "Hold another seat with different passenger"
+          },
+          "response": []
+        },
+        {
+          "name": "Hold Already Held Seat (Conflict)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"DEMO789\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/FL-123/seats/1A/hold",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "FL-123", "seats", "1A", "hold"]
+            },
+            "description": "Attempt to hold an already held seat (should return 409)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 3: Hold available seats with 120s TTL"
+    },
+    {
+      "name": "4. Seat Confirm (HELD → CONFIRMED)",
+      "item": [
+        {
+          "name": "Confirm Held Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"{{checkinId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/holds/{{holdId}}/confirm",
+              "host": ["{{BASE_URL}}"],
+              "path": ["holds", "{{holdId}}", "confirm"]
+            },
+            "description": "Confirm a held seat before expiry"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Non-existent Hold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"DEMO123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/holds/hold-invalid/confirm",
+              "host": ["{{BASE_URL}}"],
+              "path": ["holds", "hold-invalid", "confirm"]
+            },
+            "description": "Attempt to confirm non-existent hold (should return 404)"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm with Wrong Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"WRONG_PASSENGER\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/holds/{{holdId}}/confirm",
+              "host": ["{{BASE_URL}}"],
+              "path": ["holds", "{{holdId}}", "confirm"]
+            },
+            "description": "Attempt to confirm with wrong passenger ID (should fail)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 4: Confirm held seats before expiry"
+    },
+    {
+      "name": "5. Seat Cancel/Release",
+      "item": [
+        {
+          "name": "Cancel Hold (Passenger)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed mind\",\n  \"actorRole\": \"passenger\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/holds/{{holdId}}/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["holds", "{{holdId}}", "cancel"]
+            },
+            "description": "Cancel a held seat as a passenger"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Hold (Agent)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Administrative cancellation\",\n  \"actorRole\": \"agent\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/holds/hold-2B/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["holds", "hold-2B", "cancel"]
+            },
+            "description": "Cancel a seat as an agent with reason code"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Confirmed Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"{{checkinId}}\",\n  \"reason\": \"Flight changed\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/{{flightId}}/seats/{{seatId}}/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "{{flightId}}", "seats", "{{seatId}}", "cancel"]
+            },
+            "description": "Cancel a confirmed seat and release it back to available"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 5: Cancel or release held/confirmed seats"
+    },
+    {
+      "name": "6. Waitlist Management",
+      "item": [
+        {
+          "name": "Join Waitlist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('waitlistEntryId', response.entryId);",
+                  "    console.log('Waitlist Entry ID:', response.entryId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"DEMO789\",\n  \"preferences\": {\n    \"seatType\": \"window\",\n    \"section\": \"front\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/{{flightId}}/waitlist",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "{{flightId}}", "waitlist"]
+            },
+            "description": "Join the waitlist with seat preferences when flight is full"
+          },
+          "response": []
+        },
+        {
+          "name": "Join Waitlist - No Preferences",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passengerId\": \"DEMOA1B\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/flights/FL-123/waitlist",
+              "host": ["{{BASE_URL}}"],
+              "path": ["flights", "FL-123", "waitlist"]
+            },
+            "description": "Join waitlist without specific preferences"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 6: Waitlist management with FIFO assignment"
+    },
+    {
+      "name": "7. Baggage & Payment Flow",
+      "item": [
+        {
+          "name": "Submit Baggage - Normal Weight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 20\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/checkins/{{checkinId}}/baggage",
+              "host": ["{{BASE_URL}}"],
+              "path": ["checkins", "{{checkinId}}", "baggage"]
+            },
+            "description": "Submit normal baggage weight (≤25kg) - completes check-in"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Baggage - Overweight",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('paymentIntentId', response.paymentIntentId);",
+                  "    console.log('Payment Intent ID:', response.paymentIntentId);",
+                  "    console.log('State:', response.state);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 35\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/checkins/{{checkinId}}/baggage",
+              "host": ["{{BASE_URL}}"],
+              "path": ["checkins", "{{checkinId}}", "baggage"]
+            },
+            "description": "Submit overweight baggage (>25kg) - triggers payment flow"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Baggage - Edge Case (25kg)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 25\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/checkins/DEMO456/baggage",
+              "host": ["{{BASE_URL}}"],
+              "path": ["checkins", "DEMO456", "baggage"]
+            },
+            "description": "Test edge case with exactly 25kg baggage"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 7: Baggage validation with payment pause for overweight"
+    },
+    {
+      "name": "8. Payment Webhook",
+      "item": [
+        {
+          "name": "Payment Webhook - Success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intentId\": \"{{paymentIntentId}}\",\n  \"status\": \"succeeded\",\n  \"providerIdempotencyKey\": \"idempotency-key-12345\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/webhook",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "webhook"]
+            },
+            "description": "Simulate successful payment webhook to resume check-in"
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Webhook - Failed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intentId\": \"{{paymentIntentId}}\",\n  \"status\": \"failed\",\n  \"providerIdempotencyKey\": \"idempotency-key-67890\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/webhook",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "webhook"]
+            },
+            "description": "Simulate failed payment webhook"
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Webhook - Idempotent Replay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intentId\": \"{{paymentIntentId}}\",\n  \"status\": \"succeeded\",\n  \"providerIdempotencyKey\": \"idempotency-key-12345\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payments/webhook",
+              "host": ["{{BASE_URL}}"],
+              "path": ["payments", "webhook"]
+            },
+            "description": "Test idempotent webhook handling with same idempotency key"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 8: Payment webhook to finalize check-in after payment"
+    },
+    {
+      "name": "9. Abuse Detection & Monitoring",
+      "item": [
+        {
+          "name": "Get Recent Abuse Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/abuse/recent",
+              "host": ["{{BASE_URL}}"],
+              "path": ["admin", "abuse", "recent"]
+            },
+            "description": "Retrieve recent abuse detection events (admin endpoint)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Abuse Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/abuse/stats",
+              "host": ["{{BASE_URL}}"],
+              "path": ["admin", "abuse", "stats"]
+            },
+            "description": "Get abuse detection statistics and metrics"
+          },
+          "response": []
+        },
+        {
+          "name": "Unblock IP Address",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/abuse/unblock/192.168.1.100",
+              "host": ["{{BASE_URL}}"],
+              "path": ["admin", "abuse", "unblock", "192.168.1.100"]
+            },
+            "description": "Manually unblock an IP address"
+          },
+          "response": []
+        }
+      ],
+      "description": "Business Scenario 9: Abuse and bot detection monitoring endpoints"
+    },
+    {
+      "name": "Integration Test Scenarios",
+      "item": [
+        {
+          "name": "Full Happy Path Flow",
+          "item": [
+            {
+              "name": "1. Login",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Login successful', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.environment.set('testCheckinId', response.checkinId);",
+                      "    pm.environment.set('testFlightId', response.flightId);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pnr\": \"DEMOC2D\",\n  \"lastName\": \"demo\"\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/auth/pnr-login",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["auth", "pnr-login"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2. Get Seat Map",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Seat map retrieved', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{BASE_URL}}/flights/{{testFlightId}}/seatmap",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["flights", "{{testFlightId}}", "seatmap"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3. Hold Seat",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Seat held successfully', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.environment.set('testHoldId', response.holdId);",
+                      "    pm.environment.set('testSeatId', response.seatId);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"passengerId\": \"{{testCheckinId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/flights/{{testFlightId}}/seats/5C/hold",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["flights", "{{testFlightId}}", "seats", "5C", "hold"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "4. Confirm Seat",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Seat confirmed', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"passengerId\": \"{{testCheckinId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/holds/{{testHoldId}}/confirm",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["holds", "{{testHoldId}}", "confirm"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5. Submit Baggage",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Baggage submitted', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"weightKg\": 22\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/checkins/{{testCheckinId}}/baggage",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["checkins", "{{testCheckinId}}", "baggage"]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Complete happy path: Login → Seat Map → Hold → Confirm → Baggage"
+        },
+        {
+          "name": "Overweight Baggage with Payment Flow",
+          "item": [
+            {
+              "name": "1. Login",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "pm.environment.set('paymentTestCheckinId', response.checkinId);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pnr\": \"DEMOE3F\",\n  \"lastName\": \"demo\"\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/auth/pnr-login",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["auth", "pnr-login"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2. Submit Overweight Baggage",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Payment required for overweight', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.state).to.equal('WAITING_FOR_PAYMENT');",
+                      "    pm.environment.set('testPaymentIntentId', response.paymentIntentId);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"weightKg\": 40\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/checkins/{{paymentTestCheckinId}}/baggage",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["checkins", "{{paymentTestCheckinId}}", "baggage"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3. Payment Webhook Success",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Payment processed', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"intentId\": \"{{testPaymentIntentId}}\",\n  \"status\": \"succeeded\",\n  \"providerIdempotencyKey\": \"test-idempotency-{{$timestamp}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/payments/webhook",
+                  "host": ["{{BASE_URL}}"],
+                  "path": ["payments", "webhook"]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Test overweight baggage → payment pause → webhook resume"
+        }
+      ],
+      "description": "End-to-end integration test scenarios"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Running request to:', pm.request.url);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Response time is acceptable', function() {",
+          "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+          "});",
+          "",
+          "pm.test('Response has valid content-type', function() {",
+          "    pm.response.to.have.header('Content-Type');",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3002",
+      "type": "string"
+    },
+    {
+      "key": "flightId",
+      "value": "FL-123",
+      "type": "string"
+    },
+    {
+      "key": "checkinId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "holdId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seatId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentIntentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "waitlistEntryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testCheckinId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testFlightId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testHoldId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testSeatId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPaymentIntentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentTestCheckinId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -2,43 +2,134 @@ openapi: 3.1.0
 info:
   title: SkyHigh Core API
   version: 0.1.0
-  description: Core check-in and seat management API (Fastify backend).
+  description: Core check-in and seat management API (Fastify backend). Complete specification covering all 8 business scenarios including authentication, seat management, waitlist, baggage, payment, and abuse detection.
 servers:
+  - url: http://localhost:3002
+    description: Development server
   - url: http://localhost:3000
+    description: Alternative port
 paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Check if the API server is running
+      tags:
+        - Health & Status
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      summary: Readiness check endpoint
+      description: Check if the API server is ready to accept requests
+      tags:
+        - Health & Status
+      responses:
+        '200':
+          description: Server is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
   /auth/pnr-login:
     post:
       summary: Login via PNR and last name
+      description: Authenticate passenger using PNR (Passenger Name Record) and last name to retrieve booking context and seat map
+      tags:
+        - Authentication
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/PnrLoginRequest'
+            examples:
+              demo_user_1:
+                summary: Demo User 1
+                value:
+                  pnr: DEMO123
+                  lastName: demo
+              demo_user_2:
+                summary: Demo User 2
+                value:
+                  pnr: DEMO456
+                  lastName: demo
       responses:
         '200':
-          description: Booking context
+          description: Booking context with current seat assignment and seat map
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PnrLoginResponse'
         '401':
-          description: Invalid PNR/last name
+          description: Invalid PNR or last name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid PNR or last name
+        '404':
+          description: Check-in not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Checkin not found
   /flights/{flightId}/seatmap:
     get:
       summary: Get seat map for a flight
+      description: Retrieve the complete seat map with all seat states (AVAILABLE, HELD, CONFIRMED, CANCELLED). Cache-backed for performance with <1s P95 response time.
+      tags:
+        - Seat Management
       parameters:
         - $ref: '#/components/parameters/flightId'
       responses:
         '200':
-          description: Seat map with states
+          description: Seat map with states and last update timestamp
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SeatMapResponse'
+              example:
+                flightId: FL-123
+                lastUpdated: '2026-02-08T12:00:00Z'
+                seats:
+                  - seatId: 1A
+                    state: AVAILABLE
+                    heldBy: null
+                    holdExpiresAt: null
+                  - seatId: 2B
+                    state: HELD
+                    heldBy: DEMO123
+                    holdExpiresAt: '2026-02-08T12:02:00Z'
+                  - seatId: 3C
+                    state: CONFIRMED
+                    heldBy: DEMO456
+                    holdExpiresAt: null
   /flights/{flightId}/seats/{seatId}/hold:
     post:
       summary: Place a 120s hold on an AVAILABLE seat
+      description: Atomically hold an available seat for 120 seconds. Prevents double bookings through conditional updates.
+      tags:
+        - Seat Management
       parameters:
         - $ref: '#/components/parameters/flightId'
         - $ref: '#/components/parameters/seatId'
@@ -48,34 +139,89 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/HoldRequest'
+            example:
+              passengerId: DEMO123
       responses:
         '200':
-          description: Hold placed
+          description: Hold placed successfully with 120s expiry
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldResponse'
+              example:
+                holdId: hold-1A
+                seatId: 1A
+                flightId: FL-123
+                state: HELD
+                holdExpiresAt: '2026-02-08T12:02:00Z'
         '409':
-          description: Seat not AVAILABLE
+          description: Seat not available (already held, confirmed, or cancelled)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Seat not available
   /holds/{holdId}/confirm:
     post:
       summary: Confirm a held seat
+      description: Confirm a held seat before expiry. Validates ownership and expiry. Idempotent for same owner.
+      tags:
+        - Seat Management
       parameters:
         - $ref: '#/components/parameters/holdId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passengerId]
+              properties:
+                passengerId:
+                  type: string
+                  description: Passenger ID who owns the hold
+            example:
+              passengerId: DEMO123
       responses:
         '200':
-          description: Seat confirmed
+          description: Seat confirmed successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConfirmResponse'
+              example:
+                seatId: 1A
+                flightId: FL-123
+                state: CONFIRMED
         '404':
           description: Hold not found or expired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Hold not found or expired
         '409':
-          description: Ownership or state mismatch
+          description: Ownership mismatch or invalid state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Ownership or state mismatch
   /holds/{holdId}/cancel:
     post:
-      summary: Cancel a hold or confirmed seat
+      summary: Cancel a hold
+      description: Cancel a held seat and release it back to available. Can be performed by passenger or agent (with reason code).
+      tags:
+        - Seat Management
       parameters:
         - $ref: '#/components/parameters/holdId'
       requestBody:
@@ -84,16 +230,81 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CancelRequest'
+            examples:
+              passenger_cancel:
+                summary: Passenger cancellation
+                value:
+                  reason: Changed mind
+                  actorRole: passenger
+              agent_cancel:
+                summary: Agent cancellation
+                value:
+                  reason: Administrative cancellation
+                  actorRole: agent
       responses:
         '200':
-          description: Seat released/cancelled
+          description: Hold cancelled and seat released
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CancelResponse'
+              example:
+                seatId: 1A
+                flightId: FL-123
+                state: AVAILABLE
+  /flights/{flightId}/seats/{seatId}/cancel:
+    post:
+      summary: Cancel a confirmed seat
+      description: Cancel a confirmed seat assignment and release it back to available. Triggers waitlist assignment if applicable.
+      tags:
+        - Seat Management
+      parameters:
+        - $ref: '#/components/parameters/flightId'
+        - $ref: '#/components/parameters/seatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passengerId]
+              properties:
+                passengerId:
+                  type: string
+                  description: Passenger ID who owns the confirmed seat
+                reason:
+                  type: string
+                  description: Reason for cancellation
+            example:
+              passengerId: DEMO123
+              reason: Flight changed
+      responses:
+        '200':
+          description: Confirmed seat cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResponse'
+              example:
+                seatId: 1A
+                flightId: FL-123
+                state: AVAILABLE
+        '404':
+          description: Seat not found or not owned by passenger
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to cancel seat
   /flights/{flightId}/waitlist:
     post:
       summary: Join waitlist for a flight
+      description: Add passenger to waitlist with optional seat preferences. FIFO assignment when seats become available.
+      tags:
+        - Waitlist
       parameters:
         - $ref: '#/components/parameters/flightId'
       requestBody:
@@ -102,16 +313,35 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/WaitlistRequest'
+            examples:
+              with_preferences:
+                summary: With seat preferences
+                value:
+                  passengerId: DEMO789
+                  preferences:
+                    seatType: window
+                    section: front
+              no_preferences:
+                summary: Without preferences
+                value:
+                  passengerId: DEMOA1B
       responses:
         '200':
-          description: Waitlist entry created
+          description: Waitlist entry created successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WaitlistResponse'
+              example:
+                entryId: wl-12345
+                flightId: FL-123
+                status: QUEUED
   /checkins/{checkinId}/baggage:
     post:
       summary: Submit baggage weight for check-in
+      description: Submit baggage weight. Overweight (>25kg) triggers payment flow and pauses check-in. Normal weight completes check-in.
+      tags:
+        - Baggage & Payment
       parameters:
         - $ref: '#/components/parameters/checkinId'
       requestBody:
@@ -120,29 +350,148 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/BaggageRequest'
+            examples:
+              normal_weight:
+                summary: Normal baggage (≤25kg)
+                value:
+                  weightKg: 20
+              overweight:
+                summary: Overweight baggage (>25kg)
+                value:
+                  weightKg: 35
+              edge_case:
+                summary: Edge case (exactly 25kg)
+                value:
+                  weightKg: 25
       responses:
         '200':
-          description: Check-in state after baggage
+          description: Baggage processed. State indicates if payment is required.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BaggageResponse'
+              examples:
+                completed:
+                  summary: Normal weight - check-in completed
+                  value:
+                    checkinId: DEMO123
+                    state: COMPLETED
+                    paymentIntentId: null
+                waiting_for_payment:
+                  summary: Overweight - payment required
+                  value:
+                    checkinId: DEMO123
+                    state: WAITING_FOR_PAYMENT
+                    paymentIntentId: pi-12345
   /payments/webhook:
     post:
       summary: Payment provider webhook to resume check-in
+      description: Idempotent webhook handler to finalize payment and resume check-in from WAITING_FOR_PAYMENT to COMPLETED.
+      tags:
+        - Baggage & Payment
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/PaymentWebhookRequest'
+            examples:
+              success:
+                summary: Successful payment
+                value:
+                  intentId: pi-12345
+                  status: succeeded
+                  providerIdempotencyKey: idempotency-key-12345
+              failure:
+                summary: Failed payment
+                value:
+                  intentId: pi-12345
+                  status: failed
+                  providerIdempotencyKey: idempotency-key-67890
       responses:
         '200':
-          description: Webhook processed (idempotent)
+          description: Webhook processed successfully (idempotent)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentWebhookResponse'
+              example:
+                intentId: pi-12345
+                status: succeeded
+                checkinId: DEMO123
+  /admin/abuse/recent:
+    get:
+      summary: Get recent abuse detection events
+      description: Retrieve recent abuse detection events for monitoring. Admin endpoint.
+      tags:
+        - Abuse Detection
+      responses:
+        '200':
+          description: List of recent abuse events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AbuseEvent'
+              example:
+                - event_id: evt-12345
+                  ip_address: 192.168.1.100
+                  event_type: RAPID_SEATMAP_ACCESS
+                  detection_time: '2026-02-08T12:00:00Z'
+                  details:
+                    unique_flights: 15
+                    time_window_ms: 2000
+                  request_count: 50
+                  time_window_ms: 2000
+  /admin/abuse/stats:
+    get:
+      summary: Get abuse detection statistics
+      description: Retrieve overall abuse detection statistics and metrics. Admin endpoint.
+      tags:
+        - Abuse Detection
+      responses:
+        '200':
+          description: Abuse detection statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbuseStats'
+              example:
+                total_blocked_ips: 5
+                total_events: 42
+                blocked_ips:
+                  - 192.168.1.100
+                  - 192.168.1.101
+  /admin/abuse/unblock/{ip}:
+    post:
+      summary: Manually unblock an IP address
+      description: Remove an IP address from the blocked list. Admin endpoint.
+      tags:
+        - Abuse Detection
+      parameters:
+        - name: ip
+          in: path
+          required: true
+          schema:
+            type: string
+          description: IP address to unblock
+          example: 192.168.1.100
+      responses:
+        '200':
+          description: IP unblocked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+              example:
+                success: true
+                message: IP 192.168.1.100 unblocked
 components:
   parameters:
     flightId:
@@ -176,20 +525,25 @@ components:
       properties:
         pnr:
           type: string
-          example: ABC123
+          description: Passenger Name Record
+          example: DEMO123
         lastName:
           type: string
-          example: Doe
+          description: Passenger's last name
+          example: demo
     PnrLoginResponse:
       type: object
       required: [checkinId, flightId, passenger, seatMap]
       properties:
         checkinId:
           type: string
+          description: Unique check-in identifier
         flightId:
           type: string
+          description: Flight identifier
         passenger:
           type: object
+          description: Passenger information
           properties:
             firstName:
               type: string
@@ -197,6 +551,10 @@ components:
               type: string
         seatMap:
           $ref: '#/components/schemas/SeatMapResponse'
+        currentSeat:
+          type: string
+          nullable: true
+          description: Currently confirmed seat ID if any
     SeatMapResponse:
       type: object
       required: [flightId, lastUpdated, seats]
@@ -338,4 +696,58 @@ components:
           type: string
           enum: [succeeded, failed]
         checkinId:
+          type: string    AbuseEvent:
+      type: object
+      required: [event_id, ip_address, event_type, detection_time, details, request_count, time_window_ms]
+      properties:
+        event_id:
           type: string
+          description: Unique event identifier
+        ip_address:
+          type: string
+          description: IP address of the abuser
+        event_type:
+          type: string
+          description: Type of abuse detected
+          example: RAPID_SEATMAP_ACCESS
+        detection_time:
+          type: string
+          format: date-time
+          description: When the abuse was detected
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional details about the abuse event
+        request_count:
+          type: integer
+          description: Number of requests in the detection window
+        time_window_ms:
+          type: integer
+          description: Time window in milliseconds
+    AbuseStats:
+      type: object
+      properties:
+        total_blocked_ips:
+          type: integer
+          description: Total number of currently blocked IPs
+        total_events:
+          type: integer
+          description: Total number of abuse events detected
+        blocked_ips:
+          type: array
+          items:
+            type: string
+          description: List of currently blocked IP addresses
+tags:
+  - name: Health & Status
+    description: Health and readiness check endpoints
+  - name: Authentication
+    description: User authentication via PNR and last name
+  - name: Seat Management
+    description: Seat map access, hold, confirm, and cancel operations
+  - name: Waitlist
+    description: Waitlist management and FIFO assignment
+  - name: Baggage & Payment
+    description: Baggage validation and payment processing
+  - name: Abuse Detection
+    description: Abuse and bot detection monitoring (admin endpoints)
